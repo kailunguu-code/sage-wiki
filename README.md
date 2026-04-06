@@ -1,6 +1,6 @@
 # sage-wiki
 
-An implementation of [Andrej Karpathy's idea](https://x.com/karpathy/status/2039805659525644595) for an LLM-compiled personal knowledge base.
+An implementation of [Andrej Karpathy's idea](https://x.com/karpathy/status/2039805659525644595) for an LLM-compiled personal knowledge base. Some lessons learned after building sage-wiki [here](https://x.com/xoai/status/2040936964799795503).
 
 Drop in your papers, articles, and notes. sage-wiki compiles them into a structured, interlinked wiki — with concepts extracted, cross-references discovered, and everything searchable.
 
