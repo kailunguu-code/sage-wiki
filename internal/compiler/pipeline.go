@@ -201,20 +201,22 @@ func Compile(projectDir string, opts CompileOpts) (*CompileResult, error) {
 		result.Summarized++
 		progress.ItemDone(sr.SourcePath, sr.SummaryPath)
 
-		// Update manifest
-		src := mf.Sources[sr.SourcePath]
-		mf.MarkCompiled(sr.SourcePath, sr.SummaryPath, sr.Concepts)
-
-		// Register source if new
-		if src.Hash == "" {
-			for _, s := range toProcess {
-				if s.Path == sr.SourcePath {
+		// Update manifest — register or update source hash
+		for _, s := range toProcess {
+			if s.Path == sr.SourcePath {
+				if _, exists := mf.Sources[sr.SourcePath]; !exists {
+					// New source
 					mf.AddSource(s.Path, s.Hash, s.Type, s.Size)
-					mf.MarkCompiled(s.Path, sr.SummaryPath, sr.Concepts)
-					break
+				} else {
+					// Existing source — update hash so it's not flagged as modified next time
+					src := mf.Sources[sr.SourcePath]
+					src.Hash = s.Hash
+					mf.Sources[sr.SourcePath] = src
 				}
+				break
 			}
 		}
+		mf.MarkCompiled(sr.SourcePath, sr.SummaryPath, sr.Concepts)
 
 		// Index in FTS5
 		memStore.Add(memory.Entry{

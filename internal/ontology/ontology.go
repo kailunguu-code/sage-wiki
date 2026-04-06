@@ -87,7 +87,10 @@ func (s *Store) AddEntity(e Entity) error {
 	return s.db.WriteTx(func(tx *sql.Tx) error {
 		_, err := tx.Exec(
 			`INSERT INTO entities (id, type, name, definition, article_path, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			 VALUES (?, ?, ?, ?, ?, ?, ?)
+			 ON CONFLICT(id) DO UPDATE SET
+			   name=excluded.name, definition=excluded.definition,
+			   article_path=excluded.article_path, updated_at=excluded.updated_at`,
 			e.ID, e.Type, e.Name, e.Definition, e.ArticlePath, e.CreatedAt, e.UpdatedAt,
 		)
 		return err
