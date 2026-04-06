@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/xoai/sage-wiki/internal/config"
 	gitpkg "github.com/xoai/sage-wiki/internal/git"
 	"github.com/xoai/sage-wiki/internal/log"
 	"github.com/xoai/sage-wiki/internal/storage"
@@ -31,12 +30,10 @@ func InitGreenfield(dir string, project string) error {
 		}
 	}
 
-	// Write config
-	cfg := config.Defaults()
-	cfg.Project = project
-	cfg.Description = fmt.Sprintf("sage-wiki project: %s", project)
+	// Write config template with comments
 	cfgPath := filepath.Join(dir, "config.yaml")
-	if err := cfg.Save(cfgPath); err != nil {
+	cfgContent := configTemplate(project, fmt.Sprintf("sage-wiki project: %s", project), false)
+	if err := os.WriteFile(cfgPath, []byte(cfgContent), 0644); err != nil {
 		return fmt.Errorf("init: save config: %w", err)
 	}
 
@@ -91,28 +88,22 @@ func InitVaultOverlay(dir string, project string, sourceFolders []string, ignore
 		return fmt.Errorf("init: create .sage: %w", err)
 	}
 
-	// Build config
-	cfg := config.Defaults()
-	cfg.Project = project
-	cfg.Description = fmt.Sprintf("Obsidian vault with sage-wiki: %s", project)
-	cfg.Vault = &config.VaultConfig{Root: "."}
-	cfg.Output = output
-
-	// Source folders
-	cfg.Sources = make([]config.Source, len(sourceFolders))
-	for i, sf := range sourceFolders {
-		cfg.Sources[i] = config.Source{
-			Path:  sf,
-			Type:  "article", // default type
-			Watch: true,
-		}
+	// Build config template
+	// Build sources YAML
+	var sourcesYAML string
+	for _, sf := range sourceFolders {
+		sourcesYAML += fmt.Sprintf("  - path: %s\n    type: article\n    watch: true\n", sf)
 	}
 
-	// Ignore list (include output dir)
-	cfg.Ignore = append(ignoreFolders, output)
+	ignoreList := append(ignoreFolders, output)
+	var ignoreYAML string
+	for _, ig := range ignoreList {
+		ignoreYAML += fmt.Sprintf("  - %s\n", ig)
+	}
 
+	cfgContent := configTemplateVault(project, output, sourcesYAML, ignoreYAML)
 	cfgPath := filepath.Join(dir, "config.yaml")
-	if err := cfg.Save(cfgPath); err != nil {
+	if err := os.WriteFile(cfgPath, []byte(cfgContent), 0644); err != nil {
 		return fmt.Errorf("init: save config: %w", err)
 	}
 
@@ -179,4 +170,122 @@ func ScanFolders(dir string) ([]FolderInfo, error) {
 	}
 
 	return folders, nil
+}
+
+func configTemplate(project, description string, isVault bool) string {
+	return fmt.Sprintf(`# sage-wiki configuration
+# Docs: https://github.com/xoai/sage-wiki
+
+version: 1
+project: %s
+description: "%s"
+
+sources:
+  - path: raw
+    type: auto          # auto-detect from file extension
+    watch: true
+
+output: wiki
+
+# LLM provider configuration
+# Supported: anthropic, openai, gemini, ollama, openai-compatible
+# For OpenRouter or other OpenAI-compatible providers, set:
+#   provider: openai-compatible
+#   base_url: https://openrouter.ai/api/v1
+api:
+  provider: gemini
+  api_key: ${GEMINI_API_KEY}
+  # base_url:           # custom endpoint (OpenRouter, Azure, local proxy, etc.)
+  # rate_limit: 60      # requests per minute (default: auto per provider)
+
+# Model selection per task
+# Use faster/cheaper models for high-volume tasks, quality models for writing
+models:
+  summarize: gemini-2.0-flash
+  extract: gemini-2.0-flash
+  write: gemini-2.0-flash
+  lint: gemini-2.0-flash
+  query: gemini-2.0-flash
+
+# Embedding configuration (optional — auto-detected from api provider)
+# Override to use a different provider/model for embeddings
+embed:
+  provider: auto        # auto, openai, gemini, ollama, voyage, mistral
+  # model:              # override model (e.g., text-embedding-3-small)
+  # api_key:            # separate API key for embeddings
+  # base_url:           # separate endpoint for embeddings
+
+compiler:
+  max_parallel: 4
+  debounce_seconds: 2
+  summary_max_tokens: 2000
+  article_max_tokens: 4000
+  auto_commit: true
+  auto_lint: true
+
+search:
+  hybrid_weight_bm25: 0.7
+  hybrid_weight_vector: 0.3
+  default_limit: 10
+
+serve:
+  transport: stdio      # stdio or sse
+  port: 3333            # SSE mode only
+`, project, description)
+}
+
+func configTemplateVault(project, output, sourcesYAML, ignoreYAML string) string {
+	return fmt.Sprintf(`# sage-wiki configuration (vault overlay)
+# Docs: https://github.com/xoai/sage-wiki
+
+version: 1
+project: %s
+description: "Obsidian vault with sage-wiki: %s"
+
+vault:
+  root: .
+
+sources:
+%s
+output: %s
+
+ignore:
+%s
+# LLM provider configuration
+# Supported: anthropic, openai, gemini, ollama, openai-compatible
+# For OpenRouter or other OpenAI-compatible providers, set:
+#   provider: openai-compatible
+#   base_url: https://openrouter.ai/api/v1
+api:
+  provider: gemini
+  api_key: ${GEMINI_API_KEY}
+  # base_url:           # custom endpoint (OpenRouter, Azure, local proxy, etc.)
+  # rate_limit: 60      # requests per minute
+
+models:
+  summarize: gemini-2.0-flash
+  extract: gemini-2.0-flash
+  write: gemini-2.0-flash
+  lint: gemini-2.0-flash
+  query: gemini-2.0-flash
+
+# Embedding configuration (optional — auto-detected from api provider)
+embed:
+  provider: auto
+  # model:              # override embedding model
+  # api_key:            # separate API key for embeddings
+  # base_url:           # separate endpoint for embeddings
+
+compiler:
+  max_parallel: 4
+  auto_commit: true
+  auto_lint: true
+
+search:
+  hybrid_weight_bm25: 0.7
+  hybrid_weight_vector: 0.3
+
+serve:
+  transport: stdio
+`, project, project, sourcesYAML, output, ignoreYAML)
 }
