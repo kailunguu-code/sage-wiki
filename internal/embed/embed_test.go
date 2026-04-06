@@ -134,18 +134,19 @@ func TestCascadeTier0InheritsAPICredentials(t *testing.T) {
 	}
 }
 
-func TestCascadeTier0FallbackDimensions(t *testing.T) {
-	// Unknown model with no explicit dimensions should fall back to 1536
+func TestCascadeTier0AutoDetectDimensions(t *testing.T) {
+	// Unknown model with no explicit dimensions should start at 0 (auto-detect)
 	ov := &EmbedOverride{
-		Model:  "unknown-model",
+		Model:  "qwen/qwen3-embedding-8b",
 		APIKey: "sk-test",
 	}
 	e := NewCascade("openai", "sk-test", "", ov)
 	if e == nil {
 		t.Fatal("expected embedder")
 	}
-	if e.Dimensions() != 1536 {
-		t.Errorf("expected fallback 1536 dims, got %d", e.Dimensions())
+	// Dimensions are 0 until first embed call auto-detects
+	if e.Dimensions() != 0 {
+		t.Errorf("expected 0 (auto-detect), got %d", e.Dimensions())
 	}
 }
 

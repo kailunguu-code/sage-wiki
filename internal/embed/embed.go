@@ -85,11 +85,8 @@ func NewCascade(provider string, apiKey string, baseURL string, override *EmbedO
 			dims := override.Dimensions
 			if dims == 0 {
 				dims = defaultDimensions[override.Model]
-				if dims == 0 {
-					dims = 1536
-					log.Warn("unknown model dimensions, falling back to 1536", "model", override.Model)
-				}
 			}
+			// dims may be 0 for unknown models — will auto-detect from first response
 			embedder := &APIEmbedder{
 				provider: p,
 				model:    override.Model,
@@ -97,7 +94,11 @@ func NewCascade(provider string, apiKey string, baseURL string, override *EmbedO
 				baseURL:  url,
 				dims:     dims,
 			}
-			log.Info("embedding provider detected", "tier", 0, "provider", p, "model", override.Model, "dims", dims)
+			if dims > 0 {
+				log.Info("embedding provider detected", "tier", 0, "provider", p, "model", override.Model, "dims", dims)
+			} else {
+				log.Info("embedding provider detected", "tier", 0, "provider", p, "model", override.Model, "dims", "auto-detect")
+			}
 			return embedder
 		}
 	}
@@ -190,7 +191,15 @@ func (e *APIEmbedder) embedOpenAI(text string) ([]float32, error) {
 		return nil, fmt.Errorf("embed: empty embedding in response")
 	}
 
-	return result.Data[0].Embedding, nil
+	embedding := result.Data[0].Embedding
+
+	// Auto-detect dimensions from first response
+	if e.dims == 0 {
+		e.dims = len(embedding)
+		log.Info("auto-detected embedding dimensions", "model", e.model, "dims", e.dims)
+	}
+
+	return embedding, nil
 }
 
 // embedGemini uses the Gemini-native /models/{model}:embedContent endpoint.
