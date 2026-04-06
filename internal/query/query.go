@@ -69,7 +69,7 @@ func Query(projectDir string, question string, format string, topK int, opts ...
 	searcher := hybrid.NewSearcher(memStore, vecStore)
 
 	// Get query embedding for hybrid search
-	embedder := embed.NewCascade(cfg.API.Provider, cfg.API.APIKey, cfg.API.BaseURL)
+	embedder := embed.NewFromConfig(cfg)
 	var queryVec []float32
 	if embedder != nil {
 		queryVec, _ = embedder.Embed(question)

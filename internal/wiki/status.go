@@ -101,7 +101,7 @@ func GetStatus(projectDir string, stores *Stores) (*StatusInfo, error) {
 	info.RelationCount, _ = ontStore.RelationCount()
 
 	// Embedding provider
-	embedder := embed.NewCascade(cfg.API.Provider, cfg.API.APIKey, cfg.API.BaseURL)
+	embedder := embed.NewFromConfig(cfg)
 	if embedder != nil {
 		info.EmbedProvider = embedder.Name()
 		info.EmbedDims = embedder.Dimensions()

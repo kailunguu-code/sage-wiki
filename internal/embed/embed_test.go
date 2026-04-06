@@ -8,7 +8,7 @@ import (
 )
 
 func TestCascadeTier1(t *testing.T) {
-	e := NewCascade("openai", "sk-test", "")
+	e := NewCascade("openai", "sk-test", "", nil)
 	if e == nil {
 		t.Fatal("expected embedder for openai")
 	}
@@ -22,14 +22,14 @@ func TestCascadeTier1(t *testing.T) {
 
 func TestCascadeAnthropicFallsThrough(t *testing.T) {
 	// Anthropic has no embedding API — should fall through
-	e := NewCascade("anthropic", "sk-ant-test", "")
+	e := NewCascade("anthropic", "sk-ant-test", "", nil)
 	// This will return nil unless Ollama is running
 	// We can't control Ollama in tests, so just verify no panic
 	_ = e
 }
 
 func TestCascadeNoProvider(t *testing.T) {
-	e := NewCascade("", "", "")
+	e := NewCascade("", "", "", nil)
 	// Should return nil (no provider, no Ollama assumed)
 	// Can't guarantee nil because Ollama might be running locally
 	_ = e
@@ -92,6 +92,60 @@ func TestAPIEmbedderErrorResponse(t *testing.T) {
 	_, err := e.Embed("test")
 	if err == nil {
 		t.Error("expected error on 429")
+	}
+}
+
+func TestCascadeTier0Override(t *testing.T) {
+	// Tier 0 override should take priority over tier 1 auto-detection
+	ov := &EmbedOverride{
+		Provider:   "openai",
+		Model:      "custom-embed-model",
+		Dimensions: 1024,
+		APIKey:     "sk-custom",
+		BaseURL:    "https://custom.example.com/v1",
+	}
+	e := NewCascade("openai", "sk-default", "", ov)
+	if e == nil {
+		t.Fatal("expected embedder with override")
+	}
+	if e.Name() != "openai/custom-embed-model" {
+		t.Errorf("expected override model, got: %s", e.Name())
+	}
+	if e.Dimensions() != 1024 {
+		t.Errorf("expected 1024 dims, got %d", e.Dimensions())
+	}
+}
+
+func TestCascadeTier0InheritsAPICredentials(t *testing.T) {
+	// Override with model but no api_key should inherit from top-level api config
+	ov := &EmbedOverride{
+		Model:      "custom-embed-model",
+		Dimensions: 768,
+	}
+	e := NewCascade("openai", "sk-from-api", "https://api.example.com/v1", ov)
+	if e == nil {
+		t.Fatal("expected embedder inheriting api credentials")
+	}
+	if e.Name() != "openai/custom-embed-model" {
+		t.Errorf("expected override model, got: %s", e.Name())
+	}
+	if e.Dimensions() != 768 {
+		t.Errorf("expected 768 dims, got %d", e.Dimensions())
+	}
+}
+
+func TestCascadeTier0FallbackDimensions(t *testing.T) {
+	// Unknown model with no explicit dimensions should fall back to 1536
+	ov := &EmbedOverride{
+		Model:  "unknown-model",
+		APIKey: "sk-test",
+	}
+	e := NewCascade("openai", "sk-test", "", ov)
+	if e == nil {
+		t.Fatal("expected embedder")
+	}
+	if e.Dimensions() != 1536 {
+		t.Errorf("expected fallback 1536 dims, got %d", e.Dimensions())
 	}
 }
 

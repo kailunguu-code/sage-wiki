@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/xoai/sage-wiki/internal/config"
 	"github.com/xoai/sage-wiki/internal/log"
 )
 
@@ -35,11 +36,72 @@ var defaultDimensions = map[string]int{
 	"nomic-embed-text":       768,
 }
 
+// EmbedOverride holds optional overrides from the embed config block.
+type EmbedOverride struct {
+	Provider   string
+	Model      string
+	Dimensions int
+	APIKey     string
+	BaseURL    string
+}
+
+// NewFromConfig creates an Embedder from the project config, using embed
+// overrides when present and falling back to auto-detection from api config.
+func NewFromConfig(cfg *config.Config) Embedder {
+	var ov *EmbedOverride
+	if cfg.Embed != nil {
+		ov = &EmbedOverride{
+			Provider:   cfg.Embed.Provider,
+			Model:      cfg.Embed.Model,
+			Dimensions: cfg.Embed.Dimensions,
+			APIKey:     cfg.Embed.APIKey,
+			BaseURL:    cfg.Embed.BaseURL,
+		}
+	}
+	return NewCascade(cfg.API.Provider, cfg.API.APIKey, cfg.API.BaseURL, ov)
+}
+
 // NewCascade auto-detects the best available embedding provider.
+// Tier 0: Explicit embed config override (if model + credentials provided).
 // Tier 1: Provider embedding API (if available).
 // Tier 2: Ollama local (if running).
 // Returns nil if no embedding provider is available.
-func NewCascade(provider string, apiKey string, baseURL string) Embedder {
+func NewCascade(provider string, apiKey string, baseURL string, override *EmbedOverride) Embedder {
+	// Tier 0: Explicit embed config — user specified model/credentials
+	if override != nil && override.Model != "" {
+		p := override.Provider
+		if p == "" {
+			p = provider
+		}
+		key := override.APIKey
+		if key == "" {
+			key = apiKey
+		}
+		url := override.BaseURL
+		if url == "" {
+			url = baseURL
+		}
+		if key != "" {
+			dims := override.Dimensions
+			if dims == 0 {
+				dims = defaultDimensions[override.Model]
+				if dims == 0 {
+					dims = 1536
+					log.Warn("unknown model dimensions, falling back to 1536", "model", override.Model)
+				}
+			}
+			embedder := &APIEmbedder{
+				provider: p,
+				model:    override.Model,
+				apiKey:   key,
+				baseURL:  url,
+				dims:     dims,
+			}
+			log.Info("embedding provider detected", "tier", 0, "provider", p, "model", override.Model, "dims", dims)
+			return embedder
+		}
+	}
+
 	// Tier 1: Provider embedding API
 	if model, ok := defaultModels[provider]; ok && apiKey != "" {
 		dims := defaultDimensions[model]

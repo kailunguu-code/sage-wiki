@@ -87,7 +87,7 @@ func RunDoctor(projectDir string) *DoctorResult {
 	}
 
 	// Check embedding
-	embedder := embed.NewCascade(cfg.API.Provider, cfg.API.APIKey, cfg.API.BaseURL)
+	embedder := embed.NewFromConfig(cfg)
 	if embedder != nil {
 		result.add("embedding", "ok", fmt.Sprintf("Embedding: %s (%d-dim)", embedder.Name(), embedder.Dimensions()))
 	} else {
