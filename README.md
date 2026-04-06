@@ -110,6 +110,57 @@ Add to `.mcp.json`:
 sage-wiki serve --transport sse --port 3333
 ```
 
+## Benchmarks
+
+Evaluated on a real wiki compiled from 1,107 sources (49.4 MB database, 2,832 wiki files).
+
+Run `python3 eval.py .` on your own project to reproduce. See [eval.py](eval.py) for details.
+
+### Performance
+
+| Operation | p50 | Throughput |
+|---|--:|--:|
+| FTS5 keyword search (top-10) | 411µs | 1,775 qps |
+| Vector cosine search (2,858 × 3072d) | 81ms | 15 qps |
+| Hybrid RRF (BM25 + vector) | 80ms | 16 qps |
+| Graph traversal (BFS depth ≤ 5) | 1µs | 738K qps |
+| Cycle detection (full graph) | 1.4ms | — |
+| FTS insert (batch 100) | — | 89,802 /s |
+| Sustained mixed reads | 77µs | 8,500+ ops/s |
+
+Non-LLM compile overhead (hashing + dependency analysis) is under 1 second. The compiler's wall time is dominated entirely by LLM API calls.
+
+### Quality
+
+| Metric | Score |
+|---|--:|
+| Search recall@10 | **100%** |
+| Search recall@1 | 91.6% |
+| Source citation rate | 94.6% |
+| Alias coverage | 90.0% |
+| Fact extraction rate | 68.5% |
+| Wiki connectivity | 60.5% |
+| Cross-reference integrity | 50.0% |
+| **Overall quality score** | **73.0%** |
+
+### Running the eval
+
+```bash
+# Full evaluation (performance + quality)
+python3 eval.py /path/to/your/wiki
+
+# Performance only
+python3 eval.py --perf-only .
+
+# Quality only
+python3 eval.py --quality-only .
+
+# Machine-readable JSON
+python3 eval.py --json . > report.json
+```
+
+Requires Python 3.10+. Install `numpy` for ~10x faster vector benchmarks.
+
 ## Architecture
 
 ![Sage-Wiki Architecture](sage-wiki-architecture.png)
