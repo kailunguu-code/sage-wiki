@@ -104,6 +104,27 @@ compiler:
   auto_commit: true
 ```
 
+## Customizing Prompts
+
+sage-wiki uses built-in prompts for summarization and article writing. To customize:
+
+```bash
+sage-wiki init --prompts    # scaffolds prompts/ directory with defaults
+```
+
+This creates editable markdown files:
+
+```
+prompts/
+├── summarize-article.md    # how articles are summarized
+├── summarize-paper.md      # how papers are summarized
+├── write-article.md        # how concept articles are written
+├── extract-concepts.md     # how concepts are identified
+└── caption-image.md        # how images are described
+```
+
+Edit any file to change how sage-wiki processes that type. Add new source types by creating `summarize-{type}.md` (e.g., `summarize-dataset.md`). Delete a file to revert to the built-in default.
+
 ## MCP Integration
 
 ![MCP Integration](sage-wiki-interfaces.png)

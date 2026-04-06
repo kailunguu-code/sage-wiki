@@ -17,6 +17,7 @@ import (
 	"github.com/xoai/sage-wiki/internal/manifest"
 	"github.com/xoai/sage-wiki/internal/memory"
 	"github.com/xoai/sage-wiki/internal/ontology"
+	"github.com/xoai/sage-wiki/internal/prompts"
 	"github.com/xoai/sage-wiki/internal/storage"
 	"github.com/xoai/sage-wiki/internal/vectors"
 )
@@ -63,6 +64,12 @@ func Compile(projectDir string, opts CompileOpts) (*CompileResult, error) {
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
 		return nil, fmt.Errorf("compile: load config: %w", err)
+	}
+
+	// Load user prompt overrides if prompts/ directory exists
+	promptsDir := filepath.Join(projectDir, "prompts")
+	if err := prompts.LoadFromDir(promptsDir); err != nil {
+		log.Warn("failed to load custom prompts", "error", err)
 	}
 
 	// Load manifest

@@ -104,10 +104,10 @@ func summarizeOne(
 	extract.ChunkIfNeeded(content, maxTokens*2) // Allow 2x for input
 	result.ChunkCount = content.ChunkCount
 
-	// Select prompt template
-	templateName := "summarize_article"
-	if content.Type == "paper" {
-		templateName = "summarize_paper"
+	// Select prompt template — try type-specific first, fall back to article
+	templateName := "summarize_" + content.Type
+	if _, err := prompts.Render(templateName, prompts.SummarizeData{}); err != nil {
+		templateName = "summarize_article" // fallback for unknown types
 	}
 
 	if content.ChunkCount <= 1 {

@@ -16,6 +16,7 @@ import (
 	"github.com/xoai/sage-wiki/internal/linter"
 	"github.com/xoai/sage-wiki/internal/memory"
 	mcppkg "github.com/xoai/sage-wiki/internal/mcp"
+	"github.com/xoai/sage-wiki/internal/prompts"
 	"github.com/xoai/sage-wiki/internal/query"
 	"github.com/xoai/sage-wiki/internal/storage"
 	"github.com/xoai/sage-wiki/internal/vectors"
@@ -108,6 +109,7 @@ func init() {
 
 	// Init flags
 	initCmd.Flags().Bool("vault", false, "Initialize as vault overlay on existing Obsidian vault")
+	initCmd.Flags().Bool("prompts", false, "Scaffold prompt templates for customization")
 
 	// Compile flags
 	compileCmd.Flags().Bool("watch", false, "Watch for changes and recompile")
@@ -183,6 +185,17 @@ func runInit(cmd *cobra.Command, args []string) error {
 		if err := wiki.InitGreenfield(dir, project); err != nil {
 			return err
 		}
+	}
+
+	// Scaffold prompt templates if requested
+	scaffoldPrompts, _ := cmd.Flags().GetBool("prompts")
+	if scaffoldPrompts {
+		promptsDir := filepath.Join(dir, "prompts")
+		if err := prompts.ScaffoldDefaults(promptsDir); err != nil {
+			return fmt.Errorf("failed to scaffold prompts: %w", err)
+		}
+		fmt.Printf("Prompt templates scaffolded in prompts/\n")
+		fmt.Printf("Edit these files to customize how sage-wiki summarizes and writes articles.\n")
 	}
 
 	fmt.Printf("\nProject %q initialized. Run: sage-wiki compile --watch\n", project)
