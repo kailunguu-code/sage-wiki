@@ -201,11 +201,11 @@ api:
 # Model selection per task
 # Use faster/cheaper models for high-volume tasks, quality models for writing
 models:
-  summarize: gemini-2.0-flash
-  extract: gemini-2.0-flash
-  write: gemini-2.0-flash
-  lint: gemini-2.0-flash
-  query: gemini-2.0-flash
+  summarize: gemini-2.5-flash
+  extract: gemini-2.5-flash
+  write: gemini-2.5-flash
+  lint: gemini-2.5-flash
+  query: gemini-2.5-flash
 
 # Embedding configuration (optional — auto-detected from api provider)
 # Override to use a different provider/model for embeddings
@@ -263,11 +263,11 @@ api:
   # rate_limit: 60      # requests per minute
 
 models:
-  summarize: gemini-2.0-flash
-  extract: gemini-2.0-flash
-  write: gemini-2.0-flash
-  lint: gemini-2.0-flash
-  query: gemini-2.0-flash
+  summarize: gemini-2.5-flash
+  extract: gemini-2.5-flash
+  write: gemini-2.5-flash
+  lint: gemini-2.5-flash
+  query: gemini-2.5-flash
 
 # Embedding configuration (optional — auto-detected from api provider)
 embed:
