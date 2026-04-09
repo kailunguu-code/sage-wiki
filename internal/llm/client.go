@@ -8,6 +8,8 @@ import (
 	"math"
 	"math/rand"
 	"net/http"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -75,10 +77,18 @@ func NewClient(providerName string, apiKey string, baseURL string, rateLimit int
 // ChatCompletion sends a chat completion request with retry on rate limits.
 // If a cache is active (via SetupCache), automatically uses the cached path.
 func (c *Client) ChatCompletion(messages []Message, opts CallOpts) (*Response, error) {
+	var resp *Response
+	var err error
 	if c.cacheID != "" {
-		return c.ChatCompletionCached(c.cacheID, messages, opts)
+		resp, err = c.ChatCompletionCached(c.cacheID, messages, opts)
+	} else {
+		resp, err = c.chatCompletionDirect(messages, opts)
 	}
-	return c.chatCompletionDirect(messages, opts)
+	if err != nil {
+		return nil, err
+	}
+	resp.Content = stripThinkTags(resp.Content)
+	return resp, nil
 }
 
 // chatCompletionDirect sends a request without checking cacheID.
@@ -248,4 +258,12 @@ func jsonBody(v any) *bytes.Buffer {
 		panic(fmt.Sprintf("llm: failed to marshal request body: %v", err))
 	}
 	return bytes.NewBuffer(data)
+}
+
+// stripThinkTags removes <think>...</think> reasoning traces from LLM responses.
+// Some models (DeepSeek, MiniMax) include these in output.
+var thinkTagRe = regexp.MustCompile(`(?s)<think>.*?</think>\s*`)
+
+func stripThinkTags(s string) string {
+	return strings.TrimSpace(thinkTagRe.ReplaceAllString(s, ""))
 }
