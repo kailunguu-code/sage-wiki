@@ -10,6 +10,7 @@ import (
 	"github.com/xoai/sage-wiki/internal/llm"
 	"github.com/xoai/sage-wiki/internal/log"
 	"github.com/xoai/sage-wiki/internal/manifest"
+	"github.com/xoai/sage-wiki/internal/prompts"
 	"github.com/xoai/sage-wiki/internal/memory"
 	"github.com/xoai/sage-wiki/internal/ontology"
 	"github.com/xoai/sage-wiki/internal/storage"
@@ -24,6 +25,11 @@ func ReExtract(projectDir string) (*CompileResult, error) {
 	cfg, err := config.Load(filepath.Join(projectDir, "config.yaml"))
 	if err != nil {
 		return nil, fmt.Errorf("re-extract: load config: %w", err)
+	}
+
+	// Load user prompt overrides if prompts/ directory exists
+	if err := prompts.LoadFromDir(filepath.Join(projectDir, "prompts")); err != nil {
+		log.Warn("failed to load custom prompts", "error", err)
 	}
 
 	mf, err := manifest.Load(filepath.Join(projectDir, ".manifest.json"))
