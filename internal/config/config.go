@@ -87,6 +87,33 @@ type SearchConfig struct {
 	HybridWeightBM25   float64 `yaml:"hybrid_weight_bm25"`
 	HybridWeightVector float64 `yaml:"hybrid_weight_vector"`
 	DefaultLimit       int     `yaml:"default_limit"`
+	QueryExpansion     *bool   `yaml:"query_expansion,omitempty"` // enable LLM query expansion (default: true)
+	Rerank             *bool   `yaml:"rerank,omitempty"`          // enable LLM re-ranking (default: true)
+	ChunkSize          int     `yaml:"chunk_size,omitempty"`      // tokens per chunk for indexing (default: 800)
+}
+
+// QueryExpansionEnabled returns whether query expansion is enabled (default: true).
+func (s SearchConfig) QueryExpansionEnabled() bool {
+	if s.QueryExpansion == nil {
+		return true
+	}
+	return *s.QueryExpansion
+}
+
+// RerankEnabled returns whether re-ranking is enabled (default: true).
+func (s SearchConfig) RerankEnabled() bool {
+	if s.Rerank == nil {
+		return true
+	}
+	return *s.Rerank
+}
+
+// ChunkSizeOrDefault returns the chunk size or 800 if not set.
+func (s SearchConfig) ChunkSizeOrDefault() int {
+	if s.ChunkSize <= 0 {
+		return 800
+	}
+	return s.ChunkSize
 }
 
 type LintingConfig struct {
@@ -236,6 +263,9 @@ func (c *Config) Validate() error {
 		if !relationNameRe.MatchString(r.Name) {
 			return fmt.Errorf("config: ontology.relations: invalid name %q (must match [a-z][a-z0-9_]*)", r.Name)
 		}
+	}
+	if c.Search.ChunkSize != 0 && (c.Search.ChunkSize < 100 || c.Search.ChunkSize > 5000) {
+		return fmt.Errorf("config: search.chunk_size must be 100-5000, got %d", c.Search.ChunkSize)
 	}
 	if c.Compiler.Timezone != "" {
 		loc, err := time.LoadLocation(c.Compiler.Timezone)

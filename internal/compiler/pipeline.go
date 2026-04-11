@@ -190,6 +190,15 @@ func Compile(projectDir string, opts CompileOpts) (*CompileResult, error) {
 	memStore := memory.NewStore(db)
 	vecStore := vectors.NewStore(db)
 	embedder := embed.NewFromConfig(cfg)
+	chunkStore := memory.NewChunkStore(db)
+
+	// Backfill chunk index if needed (after migration, before first compile)
+	if chunkStore.NeedsBackfill(memStore) {
+		log.Info("chunk index empty with existing articles — running backfill")
+		if err := BackfillChunks(projectDir, cfg.Output, cfg.Search.ChunkSizeOrDefault(), chunkStore, vecStore, embedder, db); err != nil {
+			log.Warn("chunk backfill failed", "error", err)
+		}
+	}
 
 	// Initialize checkpoint state
 	if state == nil {
@@ -365,7 +374,24 @@ func Compile(projectDir string, opts CompileOpts) (*CompileResult, error) {
 				}
 				relPatterns := ontology.RelationPatterns(merged)
 				progress.StartPhase("Pass 3: Write articles", len(concepts))
-				articles := WriteArticles(projectDir, cfg.Output, concepts, client, writeModel, articleMaxTokens, cfg.Compiler.MaxParallel, memStore, vecStore, ontStore, embedder, cfg.Compiler.UserTimeLocation(), cfg.Compiler.ArticleFields, relPatterns)
+				articles := WriteArticles(ArticleWriteOpts{
+					ProjectDir:       projectDir,
+					OutputDir:        cfg.Output,
+					Client:           client,
+					Model:            writeModel,
+					MaxTokens:        articleMaxTokens,
+					MaxParallel:      cfg.Compiler.MaxParallel,
+					MemStore:         memStore,
+					VecStore:         vecStore,
+					OntStore:         ontStore,
+					ChunkStore:       chunkStore,
+					DB:               db,
+					Embedder:         embedder,
+					UserTZ:           cfg.Compiler.UserTimeLocation(),
+					ArticleFields:    cfg.Compiler.ArticleFields,
+					RelationPatterns: relPatterns,
+					ChunkSize:        cfg.Search.ChunkSizeOrDefault(),
+				}, concepts)
 
 				for _, ar := range articles {
 					if ar.Error != nil {
@@ -623,6 +649,7 @@ func resumeBatch(
 	memStore := memory.NewStore(db)
 	vecStore := vectors.NewStore(db)
 	embedder := embed.NewFromConfig(cfg)
+	chunkStore := memory.NewChunkStore(db)
 
 	progress := NewProgress()
 	mfPath := filepath.Join(projectDir, ".manifest.json")
@@ -763,7 +790,24 @@ func resumeBatch(
 				writeCacheID, _ := client.SetupCache("You are a knowledge base article writer. Write comprehensive, well-structured wiki articles.", writeModel)
 				relPatterns := ontology.RelationPatterns(merged)
 				progress.StartPhase("Pass 3: Write articles", len(concepts))
-				articles := WriteArticles(projectDir, cfg.Output, concepts, client, writeModel, articleMaxTokens, cfg.Compiler.MaxParallel, memStore, vecStore, ontStore, embedder, cfg.Compiler.UserTimeLocation(), cfg.Compiler.ArticleFields, relPatterns)
+				articles := WriteArticles(ArticleWriteOpts{
+					ProjectDir:       projectDir,
+					OutputDir:        cfg.Output,
+					Client:           client,
+					Model:            writeModel,
+					MaxTokens:        articleMaxTokens,
+					MaxParallel:      cfg.Compiler.MaxParallel,
+					MemStore:         memStore,
+					VecStore:         vecStore,
+					OntStore:         ontStore,
+					ChunkStore:       chunkStore,
+					DB:               db,
+					Embedder:         embedder,
+					UserTZ:           cfg.Compiler.UserTimeLocation(),
+					ArticleFields:    cfg.Compiler.ArticleFields,
+					RelationPatterns: relPatterns,
+					ChunkSize:        cfg.Search.ChunkSizeOrDefault(),
+				}, concepts)
 
 				for _, ar := range articles {
 					if ar.Error != nil {

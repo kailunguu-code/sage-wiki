@@ -9,7 +9,7 @@ Drop in your papers, articles, and notes. sage-wiki compiles them into a structu
 - **Your sources in, a wiki out.** Add documents to a folder. The LLM reads, summarizes, extracts concepts, and writes interconnected articles.
 - **Compounding knowledge.** Every new source enriches existing articles. The wiki gets smarter as it grows.
 - **Works with your tools.** Opens natively in Obsidian. Connects to any LLM agent via MCP. Runs as a single binary — nothing to install beyond the API key.
-- **Ask your wiki questions.** Search across everything with hybrid BM25 + semantic search, or ask natural language questions and get cited answers.
+- **Ask your wiki questions.** Enhanced search with chunk-level indexing, LLM query expansion, and re-ranking. Ask natural language questions and get cited answers.
 
 https://github.com/user-attachments/assets/c35ee202-e9df-4ccd-b520-8f057163ff26
 
@@ -233,6 +233,9 @@ search:
   hybrid_weight_bm25: 0.7    # BM25 vs vector weight
   hybrid_weight_vector: 0.3
   default_limit: 10
+  # query_expansion: true     # LLM query expansion for Q&A (default: true)
+  # rerank: true              # LLM re-ranking for Q&A (default: true)
+  # chunk_size: 800           # tokens per chunk for indexing (100-5000)
 
 serve:
   transport: stdio            # stdio or sse
@@ -281,6 +284,25 @@ sage-wiki compile --estimate    # show cost breakdown, exit
 Or set `compiler.estimate_before: true` in config to prompt every time.
 
 **Auto mode** — Set `compiler.mode: auto` and `compiler.batch_threshold: 10` to automatically use batch when compiling 10+ sources.
+
+## Search Quality
+
+sage-wiki uses an enhanced search pipeline for Q&A queries, inspired by analyzing [qmd](https://github.com/dmayboroda/qmd)'s retrieval approach:
+
+- **Chunk-level indexing** — Articles are split into ~800-token chunks, each with its own FTS5 entry and vector embedding. A search for "flash attention" finds the relevant paragraph inside a 3000-token Transformer article.
+- **LLM query expansion** — A single LLM call generates keyword rewrites (for BM25), semantic rewrites (for vector search), and a hypothetical answer (for embedding similarity). A strong-signal check skips expansion when the top BM25 result is already confident.
+- **LLM re-ranking** — Top 15 candidates are scored by the LLM for relevance. Position-aware blending protects high-confidence retrieval results (ranks 1-3 get 75% retrieval weight, ranks 11+ get 60% reranker weight).
+- **BM25-prefiltered vector search** — Vector comparisons are limited to chunks from BM25 candidate documents, capping cosine computations at ~250 regardless of wiki size.
+
+| | sage-wiki | qmd |
+|---|---|---|
+| Chunk search | FTS5 + vector (dual-channel) | Vector-only |
+| Query expansion | LLM-based (lex/vec/hyde) | LLM-based |
+| Re-ranking | LLM + position-aware blending | Cross-encoder |
+| Ontology context | 1-hop graph traversal | No graph |
+| Cost per query | Free (Ollama) / ~$0.0006 (cloud) | Free (local GGUF) |
+
+Zero config = all features enabled. With Ollama or other local models, enhanced search is completely free — re-ranking is auto-disabled (local models struggle with structured JSON scoring) but chunk-level search and query expansion still work. With cloud LLMs, the additional cost is negligible (~$0.0006/query). Both expansion and re-ranking can be toggled via config. See the [full search quality guide](docs/guides/search-quality.md) for configuration, cost breakdown, and detailed comparison.
 
 ## Customizing Prompts
 
@@ -452,7 +474,7 @@ python3 eval.py ./test-fixture
 
 - **Storage:** SQLite with FTS5 (BM25 search) + BLOB vectors (cosine similarity)
 - **Ontology:** Typed entity-relation graph with BFS traversal and cycle detection
-- **Search:** Reciprocal Rank Fusion (RRF) combining BM25 + vector + tag boost + recency decay
+- **Search:** Enhanced pipeline with chunk-level FTS5 + vector indexing, LLM query expansion, LLM re-ranking, and RRF fusion. Falls back to document-level BM25 + vector + tag boost + recency decay
 - **Compiler:** 5-pass pipeline (diff, summarize, extract concepts, write articles, images) with prompt caching, batch API, and cost tracking
 - **MCP:** 15 tools (5 read, 8 write, 2 compound) via stdio or SSE, including `wiki_capture` for knowledge extraction from conversations
 - **TUI:** bubbletea + glamour 4-tab terminal dashboard (browse, search, Q&A, compile)
