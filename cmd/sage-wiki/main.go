@@ -26,6 +26,7 @@ import (
 	"github.com/xoai/sage-wiki/internal/web"
 	"github.com/xoai/sage-wiki/internal/query"
 	"github.com/xoai/sage-wiki/internal/scribe"
+	"github.com/xoai/sage-wiki/internal/skill"
 	"github.com/xoai/sage-wiki/internal/storage"
 	"github.com/xoai/sage-wiki/internal/vectors"
 	"github.com/xoai/sage-wiki/internal/wiki"
@@ -150,6 +151,8 @@ func init() {
 	initCmd.Flags().Bool("vault", false, "Initialize as vault overlay on existing Obsidian vault")
 	initCmd.Flags().Bool("prompts", false, "Scaffold prompt templates for customization")
 	initCmd.Flags().String("model", "gemini-2.5-flash", "Default LLM model for all tasks (e.g. gemini-2.5-flash, gemini-3.1-flash-lite)")
+	initCmd.Flags().String("skill", "", "Generate agent skill file (claude-code, cursor, windsurf, agents-md, codex, gemini, generic)")
+	initCmd.Flags().String("pack", "", "Override domain pack (codebase-memory, research-library, meeting-notes, documentation-curator)")
 
 	// Compile flags
 	compileCmd.Flags().Bool("watch", false, "Watch for changes and recompile")
@@ -181,7 +184,7 @@ func init() {
 	// Query flags
 	queryCmd.Flags().String("scope", "local", "Query scope: local, global, or all")
 
-	rootCmd.AddCommand(initCmd, compileCmd, serveCmd, lintCmd, searchCmd, queryCmd, statusCmd, ingestCmd, doctorCmd, tuiCmd, provenanceCmd, scribeCmd, diffCmd, listCmd, ontologyCmd, writeCmd, learnCmd, captureCmd, addSourceCmd, sourceCmd, hubCmd)
+	rootCmd.AddCommand(initCmd, compileCmd, serveCmd, lintCmd, searchCmd, queryCmd, statusCmd, ingestCmd, doctorCmd, tuiCmd, provenanceCmd, scribeCmd, diffCmd, listCmd, ontologyCmd, writeCmd, learnCmd, captureCmd, addSourceCmd, sourceCmd, hubCmd, skillCmd)
 }
 
 // Placeholder implementations — will be filled in subsequent tasks
@@ -247,6 +250,36 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Printf("Prompt templates scaffolded in prompts/\n")
 		fmt.Printf("Edit these files to customize how sage-wiki summarizes and writes articles.\n")
+	}
+
+	// Generate agent skill file if requested
+	skillTarget, _ := cmd.Flags().GetString("skill")
+	if skillTarget != "" {
+		target := skill.AgentTarget(skillTarget)
+		info, err := skill.TargetInfoFor(target)
+		if err != nil {
+			return err
+		}
+
+		cfgPath := filepath.Join(dir, "config.yaml")
+		cfg, err := config.Load(cfgPath)
+		if err != nil {
+			return fmt.Errorf("load config for skill generation: %w", err)
+		}
+
+		packOverride, _ := cmd.Flags().GetString("pack")
+		var pack skill.PackName
+		if packOverride != "" {
+			pack = skill.PackName(packOverride)
+		} else {
+			pack = skill.SelectPack(cfg.Sources)
+		}
+
+		data := skill.BuildTemplateData(cfg)
+		if err := skill.WriteSkill(dir, target, pack, data); err != nil {
+			return fmt.Errorf("write skill file: %w", err)
+		}
+		fmt.Printf("Agent skill written to %s\n", info.FileName)
 	}
 
 	fmt.Printf("\nProject %q initialized. Run: sage-wiki compile --watch\n", project)
