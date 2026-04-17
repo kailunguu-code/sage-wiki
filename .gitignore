@@ -6,6 +6,7 @@ CLAUDE.md
 # Sage
 .sage/
 .sage-memory/
+.sage-wiki/
 sage/
 
 # macOS
@@ -13,4 +14,4 @@ sage/
 
 # Build
 /sage-wiki
-bin/__pycache__/
+bin/
