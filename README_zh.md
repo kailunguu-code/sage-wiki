@@ -240,6 +240,8 @@ compiler:
   debounce_seconds: 2 # watch 模式防抖
   summary_max_tokens: 2000
   article_max_tokens: 4000
+  # extract_batch_size: 20     # 每次概念提取调用的摘要数 (大语料库时减小以避免 JSON 截断)
+  # extract_max_tokens: 8192   # 概念提取的最大输出 token 数 (截断时可调大至 16384)
   auto_commit: true # 编译后自动 git commit
   auto_lint: true # 编译后自动 lint
   mode: auto # standard, batch 或 auto (auto = 10+ 源文件时自动 batch)

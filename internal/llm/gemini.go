@@ -379,13 +379,8 @@ func geminiBatchState(state string) BatchStatus {
 // uploadBatchInputFile uploads a JSONL payload to the Gemini File API.
 // Returns the resource name (e.g. "files/abc123") used to reference the file in batch submission.
 func (p *geminiProvider) uploadBatchInputFile(jsonl []byte) (string, error) {
-	const boundary = "sage_wiki_batch_boundary"
-
 	var buf bytes.Buffer
-	w := multipart.NewWriter(&buf)
-	if err := w.SetBoundary(boundary); err != nil {
-		return "", fmt.Errorf("gemini batch: set boundary: %w", err)
-	}
+	w := multipart.NewWriter(&buf) // uses a randomly generated boundary
 
 	// Metadata part: tells the File API the MIME type of the content.
 	metaPart, err := w.CreatePart(textproto.MIMEHeader{
@@ -421,7 +416,7 @@ func (p *geminiProvider) uploadBatchInputFile(jsonl []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("Content-Type", "multipart/related; boundary="+boundary)
+	req.Header.Set("Content-Type", "multipart/related; boundary="+w.Boundary())
 	req.Header.Set("X-Goog-Upload-Protocol", "multipart")
 
 	client := http.Client{Timeout: 120 * time.Second}
