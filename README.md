@@ -240,6 +240,8 @@ compiler:
   debounce_seconds: 2 # watch mode debounce
   summary_max_tokens: 2000
   article_max_tokens: 4000
+  # extract_batch_size: 20     # summaries per concept-extraction call (reduce to avoid JSON truncation on large corpora)
+  # extract_max_tokens: 8192   # max output tokens for concept extraction (increase to 16384 if extraction is truncating)
   auto_commit: true # git commit after compile
   auto_lint: true # run lint after compile
   mode: auto # standard, batch, or auto (auto = batch when 10+ sources)
