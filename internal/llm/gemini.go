@@ -45,6 +45,12 @@ func newGeminiProvider(apiKey string, baseURL string) *geminiProvider {
 	// pattern is not found (non-standard endpoint).
 	uploadBase := strings.Replace(baseURL, "/v1beta", "/upload/v1beta", 1)
 	downloadBase := strings.Replace(baseURL, "/v1beta", "/download/v1beta", 1)
+	if uploadBase == baseURL {
+		// baseURL does not contain the expected "/v1beta" suffix — batch File API
+		// upload and download URLs could not be derived. Batch operations will use
+		// baseURL unchanged, which will likely fail for non-standard endpoints.
+		log.Warn("gemini: baseURL does not contain '/v1beta'; batch upload/download URLs may be incorrect", "base_url", baseURL)
+	}
 	var batchHost string
 	if u, err := url.Parse(baseURL); err == nil {
 		batchHost = u.Hostname()
