@@ -194,15 +194,25 @@ func buildFTSQuery(query string) string {
 }
 
 // SanitizeFTS strips FTS5 special characters to prevent query injection.
+// Preserves CJK ideographs, kana, and hangul for multilingual search.
 func SanitizeFTS(s string) string {
 	var buf strings.Builder
 	for _, r := range s {
-		// Keep only alphanumeric, hyphens, and underscores
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_' ||
+			isCJKOrKana(r) {
 			buf.WriteRune(r)
 		}
 	}
 	return buf.String()
+}
+
+func isCJKOrKana(r rune) bool {
+	return (r >= 0x4E00 && r <= 0x9FFF) || // CJK Unified Ideographs
+		(r >= 0x3400 && r <= 0x4DBF) || // CJK Extension A
+		(r >= 0xF900 && r <= 0xFAFF) || // CJK Compatibility Ideographs
+		(r >= 0x3040 && r <= 0x309F) || // Hiragana
+		(r >= 0x30A0 && r <= 0x30FF) || // Katakana
+		(r >= 0xAC00 && r <= 0xD7AF) // Hangul Syllables
 }
 
 var stopwords = map[string]bool{

@@ -151,6 +151,70 @@ func TestBuildFTSQuery(t *testing.T) {
 	}
 }
 
+func TestSanitizeFTSPreservesCJK(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"重大资产重组", "重大资产重组"},
+		{"hello世界", "hello世界"},
+		{"注意力机制", "注意力机制"},
+		{"トランスフォーマー", "トランスフォーマー"},       // katakana
+		{"변환기", "변환기"},                         // hangul
+		{"test*注入\"attack", "test注入attack"},     // strips FTS operators, keeps CJK
+		{"「引号」标点", "引号标点"},                     // strips CJK punctuation U+300x
+	}
+	for _, tt := range tests {
+		got := SanitizeFTS(tt.input)
+		if got != tt.expected {
+			t.Errorf("SanitizeFTS(%q) = %q, want %q", tt.input, got, tt.expected)
+		}
+	}
+}
+
+func TestBuildFTSQueryCJK(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"重大资产重组", `"重大资产重组"*`},
+		{"注意力 机制", `"注意力"* OR "机制"*`},
+		{"transformer 注意力", `"transformer"* OR "注意力"*`},
+	}
+	for _, tt := range tests {
+		got := buildFTSQuery(tt.input)
+		if got != tt.expected {
+			t.Errorf("buildFTSQuery(%q) = %q, want %q", tt.input, got, tt.expected)
+		}
+	}
+}
+
+func TestSearchCJKContent(t *testing.T) {
+	_, store := setupTestDB(t)
+
+	entries := []Entry{
+		{ID: "e1", Content: "重大资产重组是上市公司进行资产置换的重要方式", ArticlePath: "a.md"},
+		{ID: "e2", Content: "注意力机制是Transformer架构的核心组件", ArticlePath: "b.md"},
+		{ID: "e3", Content: "卷积神经网络使用滤波器进行特征提取", ArticlePath: "c.md"},
+	}
+	for _, e := range entries {
+		if err := store.Add(e); err != nil {
+			t.Fatalf("Add %s: %v", e.ID, err)
+		}
+	}
+
+	results, err := store.Search("重大资产重组", nil, 10)
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("expected results for CJK query '重大资产重组', got none")
+	}
+	if results[0].ID != "e1" {
+		t.Errorf("expected e1 as top result, got %s", results[0].ID)
+	}
+}
+
 func TestBuildFTSQueryInjection(t *testing.T) {
 	// FTS5 special characters should be stripped
 	tests := []struct {
